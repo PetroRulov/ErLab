@@ -1,0 +1,8 @@
+{application, 'ht3', [
+	{description, "New project"},
+	{vsn, "0.1.0"},
+	{modules, ['bs01','bs02','bs03','demo','ht2_tests','p01','p01_tests','p02','p02_tests','p03','p03_tests','p04','p04_tests','p05','p05_tests','p06','p06_tests','p07','p07_tests','p08','p08_tests','p09','p09_tests','p10','p10_tests','p11','p11_tests','p12','p12_tests','p13','p13_tests','p14','p14_tests','p15','p15_tests']},
+	{registered, []},
+	{applications, [kernel,stdlib]},
+	{env, []}
+]}.
