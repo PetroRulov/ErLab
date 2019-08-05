@@ -45,23 +45,23 @@ handle_info({delete_obsolete, {TableName, DropInterval}}, _State) ->
 handle_info(_, State) ->
 	{noreply, State}.
 
-init([TableName, DropInterval]) ->
-	create(TableName),
-	self() ! {info, {delete_obsolete, {TableName, DropInterval}}},
-	State = ets:tab2list(TableName),
-	{ok, State}.
-
 terminate(normal, _State) ->
 	ok;
 terminate(Reason, _State) ->
 	Reason.
 
+
+
+%% LAUNCH SERVER
 start_link(TableName, [{drop_interval, Time}]) ->
 	DropInterval = Time * 1000, 
-	%gen_server:start_link({local, ?MODULE}, ?MODULE, [TableName, DropInterval], [timeout, 5000]),
 	gen_server:start_link({local, TableName}, ?MODULE, [TableName, DropInterval], [timeout, 5000]).
-	%{ok, whereis(TableName)}.
-	
+
+init([TableName, DropInterval]) ->
+	create(TableName),
+	erlang:send_after(DropInterval, whereis(TableName), {delete_obsolete, {TableName, DropInterval}}),
+	State = ets:tab2list(TableName),
+	{ok, State}.
 
 
 
@@ -106,7 +106,6 @@ lookup(TableName, Key) ->
 		CurrentTime = element(2, erlang:timestamp()),
 		if
 			CurrentTime =< LifeTime ->
-    	        %{ok, Value};
 				Value;
         	true ->
         		io:format("There is no actual Value by the key: \"~p\"!~n", [Key])
@@ -126,7 +125,6 @@ when is_integer(FrH), is_integer(FrMin), is_integer(FrSec), is_integer(TH), is_i
         			calendar:datetime_to_gregorian_seconds(CreationDate) >= calendar:datetime_to_gregorian_seconds(DateFrom) andalso 
         			calendar:datetime_to_gregorian_seconds(CreationDate) =< calendar:datetime_to_gregorian_seconds(DateTo) end, 
         			Content),
-				%{ok, LookupContent}
 				LookupContent
 			catch
 				error:badarg -> 
