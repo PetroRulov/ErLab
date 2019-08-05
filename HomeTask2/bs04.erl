@@ -1,6 +1,7 @@
 -module(bs04).
 -export([decode/2]).
 
+%% c(bs04).
 %% bs04:decode(Json, proplist).
 %% Test = <<"{'girl': 'Rada Gaal', 'boy': 'Guy Gaal', 'active': 'true', 'formed': '2011', 'members': [{'name': 'Spider Man', 'age': '29', 'powers': ['abc def', 'ghk lmn', 'opq rs']}, {'name': 'Super Belka', 'age': '39', 'powers': ['tu wz', 'xyz']}]}">>.
 %% bs04:decode(Test, proplist).
@@ -36,13 +37,15 @@ parser(Bin = <<C/utf8, Rest/binary>>, Aux, Parts, Result) ->
 		parser(Rest, [C|Aux], Parts, Result)
 	end;
 parser(<<>>, [], [], Result) ->
-	Result;
+	aux(Result);
+	%Result;
 parser(<<>>, [], Parts, Result) ->
+	%aux(Parts),
 	Parts ++ Result.
 
 
 aux([H|T]) ->
-	io:format("~p~n", [H]),
+	io:format("~p~\n", [H]),
 	aux(T);
 aux([])->
 	io:format("~p~n", ["The end!"]),
@@ -92,7 +95,7 @@ bin_to_term(Bin) ->
 			true ->
 				binary_to_integer(BinTerm);
 			false ->
-				Result = try
+				try
 					binary_to_existing_atom(BinTerm, utf8)
 				catch
 					error: badarg -> 

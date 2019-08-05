@@ -1,23 +1,51 @@
--module(my_cache).
--export([create/1, insert/4, lookup/2, lookup_by_date/3, delete_obsolete/1]).
--export([to_timestamp/1]).
+-module(cache_server_handler).
+-behaviour(cache_server).
 
-%%% This module is a library for ets-cache creation
-%%% c(my_cache).
+-export([init/2, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
-%% my_cache:create(persons). 						Result: ok
-%% my_cache:insert(persons, rulov, "Petro", 600). 	Result: ok
-%% my_cache:lookup(persons, rulov).					Result: {ok, Value}
-%% my_cache:
-%% my_cache:delete_obsolete(persons). 				Result: ok
+%%% this module is a handler for caching (ets) cache_server module
 
-%% my_cache:insert(passwords, ivanov, "Russia,GoAhead!", 600).
-%% my_cache:insert(passwords, golovko, "!Ukraine@Ponad_use", 600).
-%% my_cache:insert(passwords, roizman, "?Usi_Goyi@", 600).
-%% my_cache:lookup_by_date(passwords, {{2019, 7, 31},{12, 59, 0}}, {{2019, 7, 31},{13, 0, 0}}).
+%% c(cache_server_handler).
+
+init(TableName, {drop_interval, DropInterval}) ->
+	create(TableName),
+	State = ets:tab2list(TableName),
+	erlang:send_after(DropInterval, whereis(cache_server), {info, {delete_obsolete, {TableName, DropInterval}}}),
+	{ok, State}.
+
+handle_call({lookup_by_date, {TableName, DateFrom, DateTo}}, _From, State) ->
+	Value = lookup_by_date(TableName, DateFrom, DateTo),
+	{ok, Value, State};
+handle_call({lookup, {TableName, Key}}, _From, State) ->
+	Value = lookup(TableName, Key),
+	{ok, Value, State};
+handle_call(_, _From, State) ->
+	{ok, noreply, State}.
+
+handle_cast({insert, {TableName, Key, Value, LifeTime}}, _State) ->
+	NewState = insert(TableName, Key, Value, LifeTime),
+	{ok, NewState};
+handle_cast(_, State) ->
+	{ok, State}.
+
+handle_info({delete, {TableName, Key}}, _State) ->
+	NewState = ets:delete(TableName, Key),
+	{noreply, NewState};
+handle_info({delete_obsolete, {TableName, DropInterval}}, _State) ->	
+	NewState = delete_obsolete(TableName),
+	erlang:send_after(DropInterval, whereis(cache_server), {info, {delete_obsolete, {TableName, DropInterval}}}),
+	{noreply, NewState};
+handle_info(_, State) ->
+	{noreply, State}.
+
+terminate(normal, _State) ->
+	ok;
+terminate(Reason, _State) ->
+	Reason.
 
 
 
+%% - a u x i l i a r y   f u n c t i o n s -
 create(TableName) ->
 	case lists:member(TableName, ets:all()) of
 		false ->
@@ -26,7 +54,7 @@ create(TableName) ->
 		true ->
 			io:format("Bad argument (ets with the name \"~p\" exists already!", [TableName])
 	end.
- 
+
 insert(TableName, Key, Value, LifeTime) when is_integer(LifeTime) ->
 	try 
 		ets:insert(TableName, {Key, Value, erlang:localtime(), (element(2, erlang:timestamp()) + LifeTime)}), 
@@ -37,6 +65,20 @@ insert(TableName, Key, Value, LifeTime) when is_integer(LifeTime) ->
 	end;
 insert(_, _, _, LifeTime) ->
 	io:format("Bad LifeTime argument (\"~p\": must be type of integer!", [LifeTime]).
+
+delete_obsolete(TableName) ->
+    try
+        OldContent = ets:tab2list(TableName),
+        CurrentTime = element(2, erlang:timestamp()),
+        NewContent = lists:filter(fun({_, _, _, LifeTime}) ->
+        	LifeTime >= CurrentTime end, OldContent),
+        ets:delete_all_objects(TableName),
+        ets:insert(TableName, NewContent),
+        ok
+    catch
+        error:badarg ->
+            io:format("Bad TableName argument: there is no ets-table with the name \"~p\"!~n", [TableName])
+    end.
 
 lookup(TableName, Key) ->
 	try
@@ -73,80 +115,3 @@ when is_integer(FrH), is_integer(FrMin), is_integer(FrSec), is_integer(TH), is_i
 	end;
 lookup_by_date(_TableName, _={_={_,_,_},{_,_,_}}, _={_={_,_,_},{_,_,_}}) ->
 	io:format("Wrong DateFrom:Time or DateTo:Time arguments!").
-
-
-delete_obsolete(TableName) ->
-    try
-        OldContent = ets:tab2list(TableName),
-        NewContent = lists:filter(fun({_, _, _, LifeTime}) ->
-        	LifeTime >= element(2, erlang:timestamp()) end, OldContent),
-        ets:delete_all_objects(TableName),
-        ets:insert(TableName, NewContent),
-        ok
-    catch
-        error:badarg ->
-            io:format("Bad TableName argument: there is no ets-table with the name \"~p\"!~n", [TableName])
-    end.
-
-
-%% internal
-%msToDate(Milliseconds) ->
-%   BaseDate      = calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
-%   Seconds       = BaseDate + (Milliseconds div 1000),
-%   { Date, Time } = calendar:gregorian_seconds_to_datetime(Seconds),
-%   { Date, Time }.
-
-to_timestamp({{Year,Month,Day},{Hours,Minutes,Seconds}}) ->
-	calendar:datetime_to_gregorian_seconds({{Year,Month,Day},{Hours,Minutes,Seconds}}).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-
-        
-%delete_obsolete(TableName) ->
-%    try
-%        OldContent = ets:tab2list(TableName),
-%        NewContent = lists:filter(fun({_, _, LifeTime}) -> LifeTime >= curr_time() end, OldContent),
-%        ets:delete_all_objects(TableName),
-%        ets:insert(TableName, NewContent),
-%        ok
-%    catch
-%        error:badarg ->
-%            {error, tableName_is_incorrect}
-%    end.
-
