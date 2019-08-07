@@ -7,16 +7,17 @@
 -export([]).
 
 %% c(cache_solo).
-%% cache_solo:start_link(passwords, [{drop_interval, 90}]).
-%% gen_server:cast(passwords, {insert, {passwords, ivanov, "Russ?a_vpered", 55}}).
-%% gen_server:cast(passwords, {insert, {passwords, roizman, "!Taki_Goy&", 120}}).
-%% gen_server:cast(passwords, {insert, {passwords, prihodko, "Ukra8ne_ponad_use@", 200}}).
+%% cache_solo:start_link(passwords, [{drop_interval, 10}]).
+%% gen_server:cast(passwords, {insert, {passwords, ivanov, "Russ?a_vpered", 25}}).
+%% gen_server:cast(passwords, {insert, {passwords, roizman, "!Taki_Goy&", 60}}).
+%% gen_server:cast(passwords, {insert, {passwords, prihodko, "Ukra8ne_ponad_use@", 45}}).
+%% ets:tab2list(passwords).
 
 %% gen_server:call(passwords, {lookup, {passwords, prihodko}}).
 %% gen_server:call(passwords, {lookup_by_date, {passwords, {{2019, 8, 5},{21, 15, 0}}, {{2019, 8, 5},{21, 16, 0}}}}).
 
 %% STOP
-%% gen_server:call(passwords, stop).
+%% gen_server:cast(passwords, stop).
 
 handle_call({lookup_by_date, {TableName, DateFrom, DateTo}}, _From, State) ->
 	Value = lookup_by_date(TableName, DateFrom, DateTo),
@@ -24,14 +25,14 @@ handle_call({lookup_by_date, {TableName, DateFrom, DateTo}}, _From, State) ->
 handle_call({lookup, {TableName, Key}}, _From, State) ->
 	Value = lookup(TableName, Key),
 	{reply, {ok, Value}, State};
-handle_call(stop, _From, State) ->
-	{reply, {stop, normal}, State};
 handle_call(_, _From, State) ->
 	{noreply, State}.
 
 handle_cast({insert, {TableName, Key, Value, LifeTime}}, _State) ->
 	NewState = insert(TableName, Key, Value, LifeTime),
 	{noreply, NewState};
+handle_cast(stop, State) ->
+    {stop, normal, State};
 handle_cast(_, State) ->
 	{noreply, State}.
 
@@ -40,7 +41,7 @@ handle_info({delete, {TableName, Key}}, _State) ->
 	{noreply, NewState};
 handle_info({delete_obsolete, {TableName, DropInterval}}, _State) ->	
 	NewState = delete_obsolete(TableName),
-	erlang:send_after(DropInterval, self(), {info, {delete_obsolete, {TableName, DropInterval}}}),
+	erlang:send_after(DropInterval, self(), {delete_obsolete, {TableName, DropInterval}}),
 	{noreply, NewState};
 handle_info(_, State) ->
 	{noreply, State}.
