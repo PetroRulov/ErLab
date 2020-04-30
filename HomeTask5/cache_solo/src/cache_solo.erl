@@ -2,7 +2,7 @@
 
 -behaviour(gen_server).
 
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/2]).
 -export([]).
 
@@ -45,6 +45,9 @@ handle_info({delete_obsolete, {TableName, DropInterval}}, _State) ->
 	{noreply, NewState};
 handle_info(_, State) ->
 	{noreply, State}.
+
+code_change(_OldVsn, State, _Extra) ->
+  {ok, State}.
 
 terminate(normal, _State) ->
 	ok;
